@@ -181,7 +181,6 @@
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
-@media (prefers-color-scheme: dark) { .badge { color: #16211b; } }
 
 .book-card__meta { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .book-card__title {
