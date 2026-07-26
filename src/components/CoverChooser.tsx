@@ -33,6 +33,7 @@ export default function CoverChooser({ book, onPick, onClose }: Props) {
   const [aiBusy, setAiBusy] = useState(false);
   const [aiDone, setAiDone] = useState(false);
   const [aiError, setAiError] = useState('');
+  const [manualUrl, setManualUrl] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -95,6 +96,30 @@ export default function CoverChooser({ book, onPick, onClose }: Props) {
           {aiError}
         </p>
       )}
+
+      <form
+        className="field"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const u = manualUrl.trim();
+          if (u) onPick(u);
+        }}
+      >
+        <label className="field__label">Of plak een link naar een afbeelding</label>
+        <div className="scanner__manual-row">
+          <input
+            className="input"
+            type="url"
+            inputMode="url"
+            placeholder="https://…/omslag.jpg"
+            value={manualUrl}
+            onChange={(e) => setManualUrl(e.target.value)}
+          />
+          <button type="submit" className="btn btn--secondary" disabled={!manualUrl.trim()}>
+            Gebruik
+          </button>
+        </div>
+      </form>
 
       <button type="button" className="btn btn--ghost btn--sm" onClick={onClose}>
         Sluiten
