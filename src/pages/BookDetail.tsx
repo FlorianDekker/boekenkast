@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, updateBook, deleteBook } from '../db';
 import { hasApiKey, normalizeToDutch } from '../api/claude';
-import { coverTint, lastNameOf } from '../lib/cover';
+import Cover from '../components/Cover';
 
 export default function BookDetail() {
   const { id } = useParams<{ id: string }>();
@@ -104,16 +104,13 @@ export default function BookDetail() {
       <main className="app__main">
         <div className="book-detail">
           <div className="book-detail__hero">
-            {book.coverUrl ? (
-              <div className="cover">
-                <img src={book.coverUrl} alt={`Cover van ${book.title}`} />
-              </div>
-            ) : (
-              <div className={`cover cover--fallback ${coverTint(book.isbn ?? book.id)}`}>
-                <span className="cover__title">{book.title}</span>
-                <span className="cover__author">{lastNameOf(book.authors?.[0])}</span>
-              </div>
-            )}
+            <Cover
+              url={book.coverUrl}
+              isbn={book.isbn}
+              title={book.title}
+              author={book.authors?.[0]}
+              seed={book.isbn ?? book.id}
+            />
             <div className="book-detail__titles">
               <h1 className="book-detail__title">{book.title}</h1>
               {authors && <span className="book-detail__author">{authors}</span>}

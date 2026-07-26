@@ -39,3 +39,39 @@ export async function fetchBookByIsbnOpenLibrary(isbn: string): Promise<LookupRe
     categories: (book.subjects ?? []).slice(0, 6).map((s) => s.name),
   };
 }
+
+interface OpenLibrarySearchDoc {
+  title?: string;
+  author_name?: string[];
+  cover_i?: number;
+  subject?: string[];
+}
+
+// Open Library's zoek-API vindt soms edities die de data-API mist.
+// Levert cover via cover_i.
+export async function fetchByIsbnOpenLibrarySearch(isbn: string): Promise<LookupResult | null> {
+  const clean = isbn.replace(/[^0-9Xx]/g, '');
+  const res = await fetch(
+    `https://openlibrary.org/search.json?isbn=${clean}&fields=title,author_name,cover_i,subject&limit=1`,
+  );
+  if (!res.ok) {
+    throw new Error(`Open Library-zoekopdracht gaf status ${res.status}`);
+  }
+  const data: { docs?: OpenLibrarySearchDoc[] } = await res.json();
+  const doc = data.docs?.[0];
+  if (!doc || !doc.title) {
+    return null;
+  }
+
+  return {
+    isbn: clean,
+    title: doc.title,
+    authors: doc.author_name,
+    coverUrl: doc.cover_i
+      ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg`
+      : undefined,
+    summary: undefined,
+    summarySource: undefined,
+    categories: (doc.subject ?? []).slice(0, 6),
+  };
+}

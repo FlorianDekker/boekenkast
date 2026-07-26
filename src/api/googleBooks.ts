@@ -30,16 +30,26 @@ function toHttps(url?: string): string | undefined {
   return url?.replace(/^http:/, 'https:');
 }
 
-export async function fetchBookByIsbn(isbn: string): Promise<LookupResult | null> {
-  const clean = isbn.replace(/[^0-9Xx]/g, '');
+async function queryGoogle(q: string): Promise<GoogleVolume | null> {
   const res = await fetch(
-    `https://www.googleapis.com/books/v1/volumes?q=isbn:${encodeURIComponent(clean)}`,
+    `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=1`,
   );
   if (!res.ok) {
     throw new Error(`Google Books gaf status ${res.status}`);
   }
   const data: GoogleBooksResponse = await res.json();
-  const info = data.items?.[0]?.volumeInfo;
+  return data.items?.[0] ?? null;
+}
+
+export async function fetchBookByIsbn(isbn: string): Promise<LookupResult | null> {
+  const clean = isbn.replace(/[^0-9Xx]/g, '');
+
+  // Eerst de exacte isbn:-zoekopdracht; vindt die niks, dan een gewone query
+  // (sommige (Nederlandse) edities komen alleen zo boven water).
+  let volume = await queryGoogle(`isbn:${clean}`);
+  if (!volume) volume = await queryGoogle(clean);
+
+  const info = volume?.volumeInfo;
   if (!info || !info.title) {
     return null;
   }
@@ -54,4 +64,13 @@ export async function fetchBookByIsbn(isbn: string): Promise<LookupResult | null
     summarySource: description ? 'google' : undefined,
     categories: info.categories ?? [],
   };
+}
+
+// Cover-afbeelding rechtstreeks uit Google's boekomslag-endpoint (los van de
+// API, dus geen quota-limiet). Werkt vaak óók voor Nederlandse boeken waar de
+// metadata-API geen cover meegaf. Geeft een 128×170-placeholder als er geen
+// cover is — die vangt de Cover-component af.
+export function googleCoverByIsbn(isbn: string): string {
+  const clean = isbn.replace(/[^0-9Xx]/g, '');
+  return `https://books.google.com/books/content?vid=ISBN${clean}&printsec=frontcover&img=1&zoom=1`;
 }

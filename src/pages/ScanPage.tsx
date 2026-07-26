@@ -4,7 +4,7 @@ import BarcodeScanner from '../scan/BarcodeScanner';
 import { lookupBook, type LookupResult } from '../api/lookup';
 import { hasApiKey, summarizeFromPhoto } from '../api/claude';
 import { addBook, newId } from '../db';
-import { coverTint, lastNameOf } from '../lib/cover';
+import Cover from '../components/Cover';
 
 type Status = 'scanning' | 'looking-up' | 'preview' | 'not-found' | 'error';
 
@@ -160,16 +160,13 @@ export default function ScanPage() {
           {status === 'preview' && result && (
             <div className="preview-card">
               <div className="preview-card__head">
-                {result.coverUrl ? (
-                  <div className="cover">
-                    <img src={result.coverUrl} alt={`Cover van ${result.title}`} />
-                  </div>
-                ) : (
-                  <div className={`cover cover--fallback ${coverTint(result.isbn ?? result.title)}`}>
-                    <span className="cover__title">{result.title}</span>
-                    <span className="cover__author">{lastNameOf(result.authors?.[0])}</span>
-                  </div>
-                )}
+                <Cover
+                  url={result.coverUrl}
+                  isbn={result.isbn}
+                  title={result.title}
+                  author={result.authors?.[0]}
+                  seed={result.isbn ?? result.title}
+                />
                 <div className="preview-card__titles">
                   <span className="preview-card__title">{result.title}</span>
                   {result.authors && (

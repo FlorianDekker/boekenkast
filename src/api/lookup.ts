@@ -1,5 +1,5 @@
 import { fetchBookByIsbn, type LookupResult } from './googleBooks';
-import { fetchBookByIsbnOpenLibrary } from './openLibrary';
+import { fetchBookByIsbnOpenLibrary, fetchByIsbnOpenLibrarySearch } from './openLibrary';
 import { fetchWikipediaSummary } from './wikipedia';
 import { translateCategoriesLocal } from '../i18n/categories';
 import { hasApiKey, normalizeToDutch } from './claude';
@@ -19,12 +19,25 @@ export async function lookupBook(isbn: string): Promise<LookupResult | null> {
     console.warn('Google Books mislukt, val terug op Open Library:', err);
   }
   if (!result) {
-    result = await fetchBookByIsbnOpenLibrary(isbn);
+    try {
+      result = await fetchBookByIsbnOpenLibrary(isbn);
+    } catch (err) {
+      console.warn('Open Library (data) mislukt:', err);
+    }
+  }
+  if (!result) {
+    try {
+      result = await fetchByIsbnOpenLibrarySearch(isbn);
+    } catch (err) {
+      console.warn('Open Library (zoek) mislukt:', err);
+    }
   }
   if (!result) return null;
 
   // Categorieën alvast lokaal naar Nederlands.
   result = { ...result, categories: translateCategoriesLocal(result.categories) };
+  // (De cover wordt in de Cover-component afgehandeld: is er geen echte cover,
+  //  dan probeert die Google's cover-by-ISBN en anders de gekleurde rug.)
 
   // Samenvatting aanvullen via Wikipedia (NL eerst) als die ontbreekt.
   if (!result.summary) {
