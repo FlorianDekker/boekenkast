@@ -1,31 +1,439 @@
+/* =========================================================================
+   Mijn Boekenkast — index.css
+   Design system: "Zacht papier" (Newsreader + Lato)
+   Bevat: tokens, reset, basistypografie, formulieren, knoppen, chips,
+   focus/hover/active states, laad- en lege toestanden.
+   Fonts: zet in index.html <head>:
+   <link rel="preconnect" href="https://fonts.googleapis.com">
+   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..500&family=Lato:ital,wght@0,400;0,700;0,900;1,400&display=swap">
+   ========================================================================= */
+
+/* ---------- 1. Tokens ---------- */
 :root {
-  --bg: #f6f3ee;
-  --surface: #ffffff;
-  --ink: #23201b;
-  --muted: #8a8378;
-  --accent: #7c5c3e;
-  --accent-ink: #ffffff;
-  --line: #e7e1d8;
-  --radius: 12px;
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  color: var(--ink);
+  /* Kleur — papier & inkt */
+  --paper:        #f6efe4;   /* app-achtergrond */
+  --paper-deep:   #efe6d8;   /* ingezonken vlakken, sticky-header bij scroll */
+  --surface:      #fffdf9;   /* kaarten, invoervelden */
+  --surface-2:    #f8f2e7;   /* hover op kaart / secundaire vulling */
+  --ink:          #2b2723;   /* primaire tekst — 13.4:1 op --paper */
+  --ink-2:        #574f46;   /* secundaire tekst — 7.4:1 */
+  --muted:        #857a6b;   /* labels, metadata — 4.6:1 (min. 13px) */
+  --line:         #e6dccb;   /* hairline */
+  --line-strong:  #d6c9b3;   /* rand op invoer/secundaire knop */
+
+  /* Kleur — accent & status */
+  --accent:       #c65f43;   /* terracotta: primaire actie */
+  --accent-press: #ab4e35;
+  --accent-soft:  #f7e5dd;
+  --accent-ink:   #ffffff;   /* 4.6:1 op --accent */
+  --green:        #3f6151;   /* gelezen / geslaagd */
+  --green-soft:   #e3ebe4;
+  --danger:       #9a3b2c;
+  --danger-soft:  #f6e2dd;
+
+  /* Cover-tinten voor boeken zónder afbeelding (kies o.b.v. ISBN-hash) */
+  --cover-1: #3f6151;  --cover-1-ink: #f2eee2;
+  --cover-2: #2f3d52;  --cover-2-ink: #eef1f6;
+  --cover-3: #c65f43;  --cover-3-ink: #fdf3ec;
+  --cover-4: #ded2bb;  --cover-4-ink: #33301f;
+  --cover-5: #6b5b7b;  --cover-5-ink: #f3eff6;
+  --cover-6: #8a6a3a;  --cover-6-ink: #fbf3e6;
+
+  /* Typografie */
+  --font-display: 'Newsreader', Georgia, 'Times New Roman', serif;
+  --font-body: 'Lato', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --fs-display: 1.75rem;  /* 28 — schermtitel */
+  --fs-h1:      1.5rem;   /* 24 — boektitel detail */
+  --fs-h2:      1.1875rem;/* 19 — sectiekop */
+  --fs-h3:      1rem;     /* 16 — kaarttitel */
+  --fs-body:    0.9375rem;/* 15 */
+  --fs-sm:      0.8125rem;/* 13 */
+  --fs-xs:      0.6875rem;/* 11 — alleen kapitalen met tracking */
+  --lh-tight: 1.18;
+  --lh-body: 1.6;
+  --track-caps: 0.14em;
+
+  /* Ruimte — 4px-basis */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 20px; --sp-6: 24px; --sp-8: 32px; --sp-10: 40px; --sp-12: 48px;
+  --gutter: var(--sp-5);
+
+  /* Radius */
+  --r-sm: 8px; --r-md: 14px; --r-lg: 18px; --r-xl: 24px; --r-pill: 999px;
+
+  /* Elevatie — bewust laag; alleen covers krijgen echte lift */
+  --sh-1: 0 1px 2px rgba(43, 39, 35, 0.06);
+  --sh-2: 0 2px 6px rgba(43, 39, 35, 0.07);
+  --sh-3: 0 6px 18px rgba(43, 39, 35, 0.10);
+  --sh-cover: 0 4px 10px rgba(43, 39, 35, 0.18);
+  --sh-accent: 0 4px 12px rgba(198, 95, 67, 0.28);
+
+  /* Overig */
+  --tap: 44px;                /* minimale tikdoelhoogte */
+  --dur: 140ms;
+  --ease: cubic-bezier(0.2, 0, 0.2, 1);
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-* {
-  box-sizing: border-box;
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #1c1a17;  --paper-deep: #161411; --surface: #262320;
+    --surface-2: #2f2b27; --ink: #f2ece1; --ink-2: #c7bdae; --muted: #9a9083;
+    --line: #38332d; --line-strong: #4a4339;
+    --accent: #e07a5c; --accent-press: #c9664a; --accent-soft: #3a2620;
+    --accent-ink: #23150f;
+    --green: #8fb39c; --green-soft: #24302a;
+    --danger: #e08a7a; --danger-soft: #3a221e;
+    --sh-cover: 0 4px 12px rgba(0, 0, 0, 0.5);
+    --sh-accent: 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
 }
 
-html,
-body,
-#root {
-  margin: 0;
-  min-height: 100%;
+/* ---------- 2. Reset ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+* { margin: 0; }
+
+html {
+  -webkit-text-size-adjust: 100%;
+  background: var(--paper);
 }
 
 body {
-  background: var(--bg);
+  min-height: 100dvh;
+  font-family: var(--font-body);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--ink);
+  background: var(--paper);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior-y: none;
 }
 
-button {
-  font-family: inherit;
+img, picture, svg, video, canvas { display: block; max-width: 100%; }
+button, input, textarea, select { font: inherit; color: inherit; }
+button { background: none; border: 0; cursor: pointer; }
+ul, ol { list-style: none; padding: 0; }
+p { text-wrap: pretty; }
+
+/* ---------- 3. Typografie ---------- */
+h1, h2, h3 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  color: var(--ink);
+  line-height: var(--lh-tight);
+  letter-spacing: -0.005em;
+}
+h1 { font-size: var(--fs-display); }
+h2 { font-size: var(--fs-h2); }
+h3 { font-size: var(--fs-h3); }
+
+.eyebrow {
+  font-family: var(--font-body);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.meta { font-size: var(--fs-sm); color: var(--ink-2); }
+.helper { font-size: var(--fs-sm); color: var(--muted); line-height: 1.5; }
+
+a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+a:hover { color: var(--accent-press); }
+
+/* ---------- 4. Focus ---------- */
+:focus { outline: none; }
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+@media (prefers-color-scheme: dark) {
+  :focus-visible { outline-color: var(--accent); }
+}
+
+/* ---------- 5. Knoppen ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  min-height: var(--tap);
+  padding: 0 var(--sp-5);
+  border-radius: var(--r-md);
+  font-family: var(--font-body);
+  font-size: var(--fs-body);
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow: var(--sh-1);
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease),
+              box-shadow var(--dur) var(--ease);
+  -webkit-tap-highlight-color: transparent;
+}
+.btn:hover { background: var(--surface-2); }
+.btn:active { box-shadow: inset 0 1px 2px rgba(43, 39, 35, 0.14); }
+.btn[disabled], .btn[aria-disabled='true'] {
+  opacity: 0.45; pointer-events: none; box-shadow: none;
+}
+
+.btn--primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  box-shadow: var(--sh-accent);
+}
+.btn--primary:hover { background: var(--accent-press); }
+.btn--primary:active { background: var(--accent-press); box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.25); }
+
+.btn--secondary {
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  box-shadow: none;
+}
+.btn--secondary:hover { background: var(--surface); border-color: var(--ink-2); }
+
+.btn--ghost { background: transparent; box-shadow: none; color: var(--ink-2); font-weight: 400; }
+.btn--ghost:hover { background: var(--surface-2); color: var(--ink); }
+
+.btn--danger { background: transparent; color: var(--danger); box-shadow: none; }
+.btn--danger:hover { background: var(--danger-soft); }
+
+.btn--block { width: 100%; }
+.btn--icon { min-width: var(--tap); padding: 0 var(--sp-3); }
+/* kleiner van vorm, niet van tikdoel */
+.btn--sm { min-height: var(--tap); padding: 0 var(--sp-4); font-size: var(--fs-sm); }
+
+/* ---------- 6. Chips (categorie-filters, toggles) ---------- */
+.filters {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--sp-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  /* rand-to-rand scrollen zonder de gutter te verliezen */
+  margin-inline: calc(var(--gutter) * -1);
+  padding-inline: var(--gutter);
+  padding-block: var(--sp-1);
+}
+.filters::-webkit-scrollbar { display: none; }
+.filters--wrap { flex-wrap: wrap; overflow: visible; margin-inline: 0; padding-inline: 0; }
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex: 0 0 auto;
+  min-height: var(--tap);
+  padding: 0 var(--sp-4);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+  font-weight: 400;
+  white-space: nowrap;
+  box-shadow: var(--sh-1);
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.chip:hover { background: var(--surface-2); color: var(--ink); }
+.chip[aria-pressed='true'], .chip--active {
+  background: var(--ink);
+  color: var(--paper);
+  box-shadow: none;
+}
+.chip__count { font-size: var(--fs-xs); opacity: 0.7; font-variant-numeric: tabular-nums; }
+
+/* Statische categorie-labels (niet klikbaar) op detail/preview */
+.chip--static {
+  min-height: 30px;
+  padding: 0 var(--sp-3);
+  background: var(--accent-soft);
+  color: var(--ink);
+  box-shadow: none;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: default;
+}
+.chip--static:hover { background: var(--accent-soft); }
+
+/* ---------- 7. Formulieren ---------- */
+.field { display: flex; flex-direction: column; gap: var(--sp-2); }
+.field__label {
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.input, .textarea {
+  width: 100%;
+  min-height: var(--tap);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--fs-body);
+  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.input::placeholder, .textarea::placeholder { color: var(--muted); }
+.input:hover, .textarea:hover { border-color: var(--line-strong); }
+.input:focus-visible, .textarea:focus-visible {
+  outline: none;
+  border-color: var(--ink);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.textarea { min-height: 116px; resize: vertical; line-height: var(--lh-body); }
+.input--mono { font-variant-numeric: tabular-nums; letter-spacing: 0.04em; }
+
+/* Zoekbalk — geen icoon: de placeholder lijnt zo dicht mogelijk uit
+   met de schermtitel erboven. */
+.search { position: relative; display: flex; align-items: center; }
+.search .input { padding-inline: var(--sp-4) 44px; border-color: transparent; box-shadow: var(--sh-1); }
+.search__clear {
+  position: absolute; right: var(--sp-2);
+  width: var(--tap); height: var(--tap);
+  display: grid; place-items: center;
+  color: var(--muted); font-size: 18px; line-height: 1;
+}
+.search__clear:hover { color: var(--ink); }
+
+/* Keuzeknop (categorie-filter) — één knop met een native dropdown,
+   dus ook op mobiel de vertrouwde systeemkiezer. */
+.select { position: relative; display: inline-flex; align-items: center; }
+.select select {
+  appearance: none;
+  -webkit-appearance: none;
+  min-height: var(--tap);
+  padding: 0 40px 0 var(--sp-4);
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  box-shadow: var(--sh-1);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.select select:hover { background: var(--surface-2); }
+.select::after {
+  content: '';
+  position: absolute;
+  right: var(--sp-4);
+  width: 7px; height: 7px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+  color: var(--muted);
+  pointer-events: none;
+}
+.select.is-active select { background: var(--ink); color: var(--paper); box-shadow: none; }
+.select.is-active::after { color: var(--paper); }
+
+/* Schakelaar (gelezen-toggle) */
+.switch {
+  position: relative;
+  flex: 0 0 auto;
+  width: 52px; height: 30px;
+  border-radius: var(--r-pill);
+  background: var(--line-strong);
+  transition: background var(--dur) var(--ease);
+}
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 3px; left: 3px;
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: var(--sh-1);
+  transition: transform var(--dur) var(--ease);
+}
+.switch[aria-checked='true'] { background: var(--green); }
+.switch[aria-checked='true']::after { transform: translateX(22px); }
+
+/* Rij met label + control; hele rij is tikdoel */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  width: 100%;
+  min-height: var(--tap);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  box-shadow: var(--sh-1);
+  text-align: left;
+}
+.toggle-row:hover { background: var(--surface-2); }
+.toggle-row__label { font-weight: 700; }
+
+/* ---------- 8. Kaart, sectie, scheiding ---------- */
+.card {
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-2);
+  padding: var(--sp-4);
+}
+.section { display: flex; flex-direction: column; gap: var(--sp-3); }
+.section__title {
+  font-family: var(--font-display);
+  font-size: var(--fs-h2);
+  font-weight: 500;
+}
+.rule { height: 1px; background: var(--line); border: 0; }
+
+/* ---------- 9. Lege & laadtoestanden ---------- */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-12) var(--sp-6);
+  text-align: center;
+}
+.empty__title { font-family: var(--font-display); font-size: var(--fs-h2); font-weight: 500; }
+.empty__body { max-width: 30ch; color: var(--ink-2); font-size: var(--fs-sm); }
+.empty__mark {
+  width: 46px; height: 64px;
+  border: 1px solid var(--line-strong);
+  border-left-width: 5px;
+  border-radius: 2px 5px 5px 2px;
+  background: var(--surface);
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--paper-deep) 37%, var(--surface-2) 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1.4s linear infinite;
+  border-radius: var(--r-sm);
+}
+.skeleton--cover { aspect-ratio: 2 / 3; border-radius: 10px; }
+.skeleton--line { height: 11px; }
+.skeleton--line.is-short { width: 58%; }
+@keyframes shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
+  * { transition-duration: 1ms !important; }
+}
+
+/* Statusregel (API-test, bronvermelding, foutmelding) */
+.status { display: inline-flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); }
+.status__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.status--ok { color: var(--green); }
+.status--ok .status__dot { background: var(--green); }
+.status--error { color: var(--danger); }
+.status--error .status__dot { background: var(--danger); }
+
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap;
 }

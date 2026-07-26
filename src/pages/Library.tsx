@@ -1,37 +1,13 @@
 import { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Link } from 'react-router-dom';
-import { db, addBook, newId } from '../db';
-import type { Book } from '../types';
+import { db } from '../db';
 import BookCard from '../components/BookCard';
-
-// Tijdelijke voorbeeldboeken om opslag te testen. Verdwijnt later.
-const SAMPLES: Omit<Book, 'id' | 'addedAt'>[] = [
-  {
-    title: 'Sapiens',
-    authors: ['Yuval Noah Harari'],
-    coverUrl: 'https://books.google.com/books/content?id=FmyBAwAAQBAJ&printsec=frontcover&img=1&zoom=1',
-    summary: 'Een beknopte geschiedenis van de mensheid.',
-    summarySource: 'manual',
-    categories: ['Geschiedenis', 'Non-fictie'],
-    status: 'to-read',
-  },
-  {
-    title: 'Dune',
-    authors: ['Frank Herbert'],
-    coverUrl: 'https://books.google.com/books/content?id=B1hSG45JCX4C&printsec=frontcover&img=1&zoom=1',
-    summary: 'Sciencefiction-epos op de woestijnplaneet Arrakis.',
-    summarySource: 'manual',
-    categories: ['Sciencefiction', 'Fictie'],
-    status: 'to-read',
-  },
-];
 
 export default function Library() {
   const books = useLiveQuery(() => db.books.orderBy('addedAt').reverse().toArray());
   const [search, setSearch] = useState('');
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [onlyToRead, setOnlyToRead] = useState(false);
+  const [filter, setFilter] = useState('Alles');
 
   // Unieke categorieën over de hele kast, alfabetisch.
   const categories = useMemo(() => {
@@ -40,12 +16,25 @@ export default function Library() {
     return [...set].sort((a, b) => a.localeCompare(b));
   }, [books]);
 
+  // Filter-opties met tellingen (Alles / Te lezen / per categorie).
+  const options = useMemo(() => {
+    const all = books ?? [];
+    const opts = [
+      { value: 'Alles', label: `Alles (${all.length})` },
+      { value: 'Te lezen', label: `Te lezen (${all.filter((b) => b.status === 'to-read').length})` },
+    ];
+    for (const c of categories) {
+      opts.push({ value: c, label: `${c} (${all.filter((b) => b.categories.includes(c)).length})` });
+    }
+    return opts;
+  }, [books, categories]);
+
   const filtered = useMemo(() => {
     if (!books) return [];
     const q = search.trim().toLowerCase();
     return books.filter((b) => {
-      if (onlyToRead && b.status !== 'to-read') return false;
-      if (activeCategory && !b.categories.includes(activeCategory)) return false;
+      if (filter === 'Te lezen' && b.status !== 'to-read') return false;
+      if (filter !== 'Alles' && filter !== 'Te lezen' && !b.categories.includes(filter)) return false;
       if (q) {
         const inTitle = b.title.toLowerCase().includes(q);
         const inAuthor = b.authors?.some((a) => a.toLowerCase().includes(q));
@@ -53,95 +42,100 @@ export default function Library() {
       }
       return true;
     });
-  }, [books, search, activeCategory, onlyToRead]);
-
-  async function addSample() {
-    const sample = SAMPLES[Math.floor(Math.random() * SAMPLES.length)];
-    await addBook({ ...sample, id: newId(), addedAt: Date.now() });
-  }
+  }, [books, search, filter]);
 
   if (books === undefined) {
-    return <p className="muted">Laden…</p>;
+    return (
+      <div className="app app--plain">
+        <main className="app__main">
+          <p className="helper" style={{ paddingTop: 24 }}>
+            Laden…
+          </p>
+        </main>
+      </div>
+    );
   }
 
+  const readCount = books.filter((b) => b.status === 'read').length;
+  const counterLabel = `${books.length} boeken · ${readCount} gelezen · ${books.length - readCount} te lezen`;
+
   return (
-    <div className="library">
-      <div className="library-toolbar">
-        <span className="count">
-          {filtered.length}
-          {filtered.length !== books.length ? ` / ${books.length}` : ''}{' '}
-          {books.length === 1 ? 'boek' : 'boeken'}
-        </span>
-        <div className="row">
-          <button type="button" className="btn ghost" onClick={addSample}>
-            + Voorbeeld
-          </button>
-          <Link to="/scan" className="btn">
-            📷 Scan boek
+    <div className="app">
+      <header className="app-header">
+        <div className="app-header__row">
+          <div className="app-header__titles">
+            <span className="eyebrow">Nog te lezen</span>
+            <span className="app-header__title">Mijn boekenkast</span>
+          </div>
+          <Link to="/settings" className="btn btn--ghost btn--sm">
+            Instellingen
           </Link>
         </div>
-      </div>
 
-      {books.length > 0 && (
-        <div className="filters">
+        <div className="search">
           <input
-            className="search"
+            className="input"
             type="search"
-            placeholder="Zoek op titel of auteur…"
+            placeholder="Zoek op titel of auteur"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          <label className="toread-toggle">
-            <input
-              type="checkbox"
-              checked={onlyToRead}
-              onChange={(e) => setOnlyToRead(e.target.checked)}
-            />
-            Alleen te-lezen
-          </label>
-          {categories.length > 0 && (
-            <div className="category-chips">
-              <button
-                type="button"
-                className={`chip filter ${activeCategory === null ? 'active' : ''}`}
-                onClick={() => setActiveCategory(null)}
-              >
-                Alle
-              </button>
-              {categories.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  className={`chip filter ${activeCategory === c ? 'active' : ''}`}
-                  onClick={() => setActiveCategory(activeCategory === c ? null : c)}
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
+          {search && (
+            <button className="search__clear" aria-label="Wissen" onClick={() => setSearch('')}>
+              ✕
+            </button>
           )}
         </div>
-      )}
 
-      {books.length === 0 ? (
-        <div className="empty">
-          <p>Je kast is nog leeg.</p>
-          <p className="muted">
-            Scan een boek via de knop hierboven, of voeg een voorbeeldboek toe om
-            de opslag te testen.
-          </p>
+        <div className="app-header__row">
+          <div className={`select${filter !== 'Alles' ? ' is-active' : ''}`}>
+            <label className="visually-hidden" htmlFor="cat">
+              Categorie
+            </label>
+            <select id="cat" value={filter} onChange={(e) => setFilter(e.target.value)}>
+              {options.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <span className="app-header__count">{counterLabel}</span>
         </div>
-      ) : filtered.length === 0 ? (
-        <div className="empty">
-          <p className="muted">Geen boeken die aan je filter voldoen.</p>
-        </div>
-      ) : (
-        <div className="shelf">
-          {filtered.map((book) => (
-            <BookCard key={book.id} book={book} />
-          ))}
-        </div>
-      )}
+      </header>
+
+      <main className="app__main">
+        {filtered.length > 0 ? (
+          <div className="shelf">
+            {filtered.map((book) => (
+              <BookCard key={book.id} book={book} />
+            ))}
+          </div>
+        ) : (
+          <div className="empty">
+            <div className="empty__mark" />
+            <span className="empty__title">
+              {books.length === 0 ? 'Nog geen boeken' : 'Niets gevonden'}
+            </span>
+            <p className="empty__body">
+              {books.length === 0
+                ? 'Scan de achterkant van een boek dat je nog wilt lezen en het staat meteen in je kast.'
+                : 'Geen boek dat aan deze zoekopdracht of dit filter voldoet.'}
+            </p>
+            {books.length === 0 && (
+              <Link to="/scan" className="btn btn--primary">
+                Scan je eerste boek
+              </Link>
+            )}
+          </div>
+        )}
+      </main>
+
+      <div className="actions-bar">
+        <Link to="/scan" className="btn btn--primary">
+          Scan boek
+        </Link>
+      </div>
     </div>
   );
 }

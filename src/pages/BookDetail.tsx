@@ -3,13 +3,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, updateBook, deleteBook } from '../db';
 import { hasApiKey, normalizeToDutch } from '../api/claude';
+import { coverTint, lastNameOf } from '../lib/cover';
 
 export default function BookDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const book = useLiveQuery(() => (id ? db.books.get(id) : undefined), [id]);
 
-  // Lokale kopie van de notitie zodat typen soepel gaat; we bewaren bij blur.
   const [note, setNote] = useState('');
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState('');
@@ -18,20 +18,36 @@ export default function BookDetail() {
   }, [book?.id]);
 
   if (book === undefined) {
-    return <p className="muted">Laden…</p>;
+    return (
+      <div className="app app--plain">
+        <main className="app__main">
+          <p className="helper" style={{ paddingTop: 24 }}>
+            Laden…
+          </p>
+        </main>
+      </div>
+    );
   }
   if (book === null) {
     return (
-      <div>
-        <p>Boek niet gevonden.</p>
-        <button type="button" className="link-btn" onClick={() => navigate('/')}>
-          ← Terug naar kast
-        </button>
+      <div className="app app--plain">
+        <header className="app-header app-header--sub">
+          <button className="app-header__back" aria-label="Terug naar kast" onClick={() => navigate('/')}>
+            ←
+          </button>
+          <span className="app-header__title">Terug naar kast</span>
+        </header>
+        <main className="app__main">
+          <p className="helper" style={{ paddingTop: 24 }}>
+            Boek niet gevonden.
+          </p>
+        </main>
       </div>
     );
   }
 
   const isRead = book.status === 'read';
+  const authors = book.authors?.join(', ') ?? '';
 
   async function toggleRead() {
     if (!book) return;
@@ -77,72 +93,87 @@ export default function BookDetail() {
   }
 
   return (
-    <div className="book-detail">
-      <button type="button" className="link-btn back" onClick={() => navigate('/')}>
-        ← Terug naar kast
-      </button>
+    <div className="app app--plain">
+      <header className="app-header app-header--sub">
+        <button className="app-header__back" aria-label="Terug naar kast" onClick={() => navigate('/')}>
+          ←
+        </button>
+        <span className="app-header__title">Terug naar kast</span>
+      </header>
 
-      <div className="detail-head">
-        {book.coverUrl ? (
-          <img className="detail-cover" src={book.coverUrl} alt={`Cover van ${book.title}`} />
-        ) : (
-          <div className="detail-cover cover-fallback">{book.title}</div>
-        )}
-        <div className="detail-info">
-          <h2>{book.title}</h2>
-          {book.authors && book.authors.length > 0 && (
-            <p className="muted">{book.authors.join(', ')}</p>
-          )}
-          {book.categories.length > 0 && (
-            <p className="chips">
-              {book.categories.map((c) => (
-                <span key={c} className="chip">
-                  {c}
-                </span>
-              ))}
-            </p>
-          )}
-          <button
-            type="button"
-            className={isRead ? 'btn' : 'btn ghost'}
-            onClick={toggleRead}
-          >
-            {isRead ? '✓ Gelezen' : 'Markeer als gelezen'}
+      <main className="app__main">
+        <div className="book-detail">
+          <div className="book-detail__hero">
+            {book.coverUrl ? (
+              <div className="cover">
+                <img src={book.coverUrl} alt={`Cover van ${book.title}`} />
+              </div>
+            ) : (
+              <div className={`cover cover--fallback ${coverTint(book.isbn ?? book.id)}`}>
+                <span className="cover__title">{book.title}</span>
+                <span className="cover__author">{lastNameOf(book.authors?.[0])}</span>
+              </div>
+            )}
+            <div className="book-detail__titles">
+              <h1 className="book-detail__title">{book.title}</h1>
+              {authors && <span className="book-detail__author">{authors}</span>}
+              {book.categories.length > 0 && (
+                <div className="book-detail__tags">
+                  {book.categories.map((c) => (
+                    <span key={c} className="chip chip--static">
+                      {c}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <button className="toggle-row" role="switch" aria-checked={isRead} onClick={toggleRead}>
+            <span className="toggle-row__label">Gelezen</span>
+            <span className="switch" aria-checked={isRead} />
           </button>
+
+          <div className="summary section">
+            <h2 className="section__title">Samenvatting</h2>
+            <div className="summary__body">
+              <p>{book.summary ?? 'Nog geen samenvatting.'}</p>
+            </div>
+            {hasApiKey() && (
+              <button
+                className="btn btn--secondary btn--sm"
+                onClick={regenerateSummary}
+                disabled={aiBusy}
+              >
+                {aiBusy ? 'AI schrijft…' : 'Uitgebreide samenvatting via AI'}
+              </button>
+            )}
+            {aiError && (
+              <p className="status status--error">
+                <span className="status__dot" />
+                {aiError}
+              </p>
+            )}
+          </div>
+
+          <div className="note-field section">
+            <h2 className="section__title">Mijn notitie</h2>
+            <textarea
+              className="textarea"
+              placeholder="Waarom wil je dit lezen? Eigen gedachten…"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              onBlur={saveNote}
+            />
+          </div>
+
+          <div className="book-detail__danger">
+            <button className="btn btn--danger btn--sm" onClick={remove}>
+              Verwijder uit kast
+            </button>
+          </div>
         </div>
-      </div>
-
-      <section className="detail-section">
-        <h3>Samenvatting</h3>
-        <p>{book.summary ?? 'Nog geen samenvatting.'}</p>
-        {hasApiKey() && (
-          <button
-            type="button"
-            className="btn ghost small"
-            onClick={regenerateSummary}
-            disabled={aiBusy}
-          >
-            {aiBusy ? 'AI schrijft…' : '🔄 Uitgebreide samenvatting via AI (NL)'}
-          </button>
-        )}
-        {aiError && <p className="scanner-error">{aiError}</p>}
-      </section>
-
-      <section className="detail-section">
-        <h3>Mijn notitie</h3>
-        <textarea
-          className="note-field"
-          placeholder="Waarom wil je dit lezen? Eigen gedachten…"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          onBlur={saveNote}
-          rows={4}
-        />
-      </section>
-
-      <button type="button" className="btn danger" onClick={remove}>
-        Verwijder uit kast
-      </button>
+      </main>
     </div>
   );
 }

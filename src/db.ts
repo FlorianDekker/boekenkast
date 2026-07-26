@@ -28,6 +28,10 @@ export async function deleteBook(id: string): Promise<void> {
   await db.books.delete(id);
 }
 
+export async function clearAllBooks(): Promise<void> {
+  await db.books.clear();
+}
+
 export async function getBook(id: string): Promise<Book | undefined> {
   return db.books.get(id);
 }

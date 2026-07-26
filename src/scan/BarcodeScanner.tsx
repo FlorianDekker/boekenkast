@@ -43,14 +43,19 @@ export default function BarcodeScanner({ onDetected }: Props) {
   }, []);
 
   if (error) {
-    return <p className="scanner-error">{error}</p>;
+    return (
+      <p className="status status--error">
+        <span className="status__dot" />
+        {error}
+      </p>
+    );
   }
 
   return (
-    <div className="scanner">
-      <video ref={videoRef} className="scanner-video" muted playsInline />
-      <div className="scanner-frame" />
-      <p className="scanner-hint">Richt op de streepjescode achterop het boek</p>
+    <div className="scanner__stage">
+      <video ref={videoRef} className="scanner__video" muted playsInline />
+      <div className="scanner__frame" />
+      <p className="scanner__hint">Houd de streepjescode op de achterkant in beeld</p>
     </div>
   );
 }

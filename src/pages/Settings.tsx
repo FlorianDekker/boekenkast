@@ -1,26 +1,53 @@
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { getApiKey, setApiKey, testApiKey } from '../api/claude';
-import { exportBooksJson, importBooksJson } from '../db';
+import {
+  db,
+  addBook,
+  newId,
+  exportBooksJson,
+  importBooksJson,
+  clearAllBooks,
+} from '../db';
+import type { Book } from '../types';
+
+// Voorbeeldboeken om zonder scanner te testen.
+const SAMPLES: Omit<Book, 'id' | 'addedAt'>[] = [
+  {
+    title: 'Sapiens',
+    authors: ['Yuval Noah Harari'],
+    summary: 'Een beknopte geschiedenis van de mensheid.',
+    summarySource: 'manual',
+    categories: ['Geschiedenis', 'Non-fictie'],
+    status: 'to-read',
+  },
+  {
+    title: 'Dune',
+    authors: ['Frank Herbert'],
+    summary: 'Sciencefiction-epos op de woestijnplaneet Arrakis.',
+    summarySource: 'manual',
+    categories: ['Sciencefiction', 'Fictie'],
+    status: 'to-read',
+  },
+];
 
 export default function Settings() {
   const navigate = useNavigate();
+  const bookCount = useLiveQuery(() => db.books.count()) ?? 0;
   const [key, setKey] = useState(getApiKey() ?? '');
-  const [saved, setSaved] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
-  const [backupMsg, setBackupMsg] = useState('');
+  const [backupMsg, setBackupMsg] = useState('Nog geen export gemaakt');
   const importInputRef = useRef<HTMLInputElement>(null);
 
-  function save() {
-    setApiKey(key);
-    setSaved(true);
+  function onKeyChange(value: string) {
+    setKey(value);
+    setApiKey(value); // meteen lokaal bewaren
     setTestResult(null);
-    setTimeout(() => setSaved(false), 2000);
   }
 
   async function runTest() {
-    setApiKey(key); // test de key die nu in het veld staat
     setTesting(true);
     setTestResult(null);
     setTestResult(await testApiKey());
@@ -32,96 +59,127 @@ export default function Settings() {
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    const date = new Date().toISOString().slice(0, 10);
+    const date = new Date().toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' });
     a.href = url;
-    a.download = `boekenkast-backup-${date}.json`;
+    a.download = `boekenkast-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    setBackupMsg(`Geëxporteerd op ${date}`);
   }
 
   async function onImportPicked(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    setBackupMsg('');
     try {
-      const text = await file.text();
-      const count = await importBooksJson(text);
+      const count = await importBooksJson(await file.text());
       setBackupMsg(`${count} boeken geïmporteerd ✓`);
     } catch (err) {
       setBackupMsg(err instanceof Error ? err.message : 'Import mislukt');
     }
   }
 
+  async function addExample() {
+    const sample = SAMPLES[Math.floor(Math.random() * SAMPLES.length)];
+    await addBook({ ...sample, id: newId(), addedAt: Date.now() });
+  }
+
+  async function resetAll() {
+    if (confirm(`Alle ${bookCount} boeken van dit apparaat verwijderen?`)) {
+      await clearAllBooks();
+    }
+  }
+
   return (
-    <div className="settings">
-      <button type="button" className="link-btn back" onClick={() => navigate('/')}>
-        ← Terug naar kast
-      </button>
-      <h2>Instellingen</h2>
+    <div className="app app--plain">
+      <header className="app-header app-header--sub">
+        <button className="app-header__back" aria-label="Terug" onClick={() => navigate('/')}>
+          ←
+        </button>
+        <span className="app-header__title">Instellingen</span>
+      </header>
 
-      <section className="detail-section">
-        <h3>Claude API-key</h3>
-        <p className="muted">
-          Nodig voor nette Nederlandse samenvattingen/categorieën en de
-          foto-fallback. Je key wordt alleen lokaal op dit apparaat bewaard en
-          gaat alleen naar Anthropic bij een samenvatting.
-        </p>
-        <p className="muted warn">
-          ⚠️ Dit is een browser-app zonder server, dus de key staat lokaal in je
-          browser. Prima voor persoonlijk gebruik op dit apparaat. Ga je de app
-          ooit publiek online zetten, gebruik dan een kleine proxy — anders is de
-          key zichtbaar.
-        </p>
-        <input
-          className="search"
-          type="password"
-          placeholder="Plak hier je Claude API-key (sk-ant-…)"
-          value={key}
-          onChange={(e) => setKey(e.target.value)}
-          autoComplete="off"
-        />
-        <div className="row" style={{ marginTop: 12 }}>
-          <button type="button" className="btn" onClick={save}>
-            Opslaan
-          </button>
-          <button type="button" className="btn ghost" onClick={runTest} disabled={testing || !key}>
-            {testing ? 'Testen…' : 'Test key'}
-          </button>
-          {saved && <span className="muted">Opgeslagen ✓</span>}
-        </div>
-        {testResult && (
-          <p className={testResult.ok ? 'test-ok' : 'scanner-error'}>{testResult.message}</p>
-        )}
-      </section>
+      <main className="app__main">
+        <div className="settings">
+          <section className="setting-group">
+            <h2 className="setting-group__title">Claude API-sleutel</h2>
+            <p className="helper">
+              Nodig voor Nederlandse AI-samenvattingen en de foto-fallback. De sleutel blijft
+              alleen op dit apparaat.
+            </p>
+            <p className="helper">
+              ⚠️ Dit is een browser-app zonder server. Prima voor persoonlijk gebruik; zet je de
+              app ooit publiek online, gebruik dan een proxy zodat de sleutel niet zichtbaar is.
+            </p>
+            <div className="field">
+              <label className="field__label">Sleutel</label>
+              <div className="setting-group__row">
+                <input
+                  className="input input--mono"
+                  type="password"
+                  placeholder="sk-ant-…"
+                  autoComplete="off"
+                  value={key}
+                  onChange={(e) => onKeyChange(e.target.value)}
+                />
+                <button className="btn btn--secondary" onClick={runTest} disabled={testing || !key}>
+                  {testing ? 'Testen…' : 'Test'}
+                </button>
+              </div>
+            </div>
+            {testResult && (
+              <span className={`status ${testResult.ok ? 'status--ok' : 'status--error'}`}>
+                <span className="status__dot" />
+                {testResult.message}
+              </span>
+            )}
+          </section>
 
-      <section className="detail-section">
-        <h3>Back-up</h3>
-        <p className="muted">
-          Je boeken staan lokaal op dit apparaat. Maak af en toe een back-up, of
-          zet 'm over naar een ander apparaat.
-        </p>
-        <div className="row">
-          <button type="button" className="btn" onClick={exportBackup}>
-            Exporteer (download)
-          </button>
-          <button
-            type="button"
-            className="btn ghost"
-            onClick={() => importInputRef.current?.click()}
-          >
-            Importeer
-          </button>
-          <input
-            ref={importInputRef}
-            type="file"
-            accept="application/json,.json"
-            hidden
-            onChange={onImportPicked}
-          />
+          <section className="setting-group">
+            <h2 className="setting-group__title">Back-up</h2>
+            <p className="helper">
+              Exporteer je kast als JSON-bestand, of zet een eerdere export terug.
+            </p>
+            <div className="setting-group__actions">
+              <button className="btn" onClick={exportBackup}>
+                Exporteren
+              </button>
+              <button className="btn" onClick={() => importInputRef.current?.click()}>
+                Importeren
+              </button>
+              <input
+                ref={importInputRef}
+                type="file"
+                accept="application/json,.json"
+                hidden
+                onChange={onImportPicked}
+              />
+            </div>
+            <span className="status">
+              <span className="status__dot" />
+              {backupMsg}
+            </span>
+          </section>
+
+          <section className="setting-group">
+            <h2 className="setting-group__title">Voorbeelddata</h2>
+            <p className="helper">
+              Voegt één boek toe om zonder scanner te testen.
+            </p>
+            <button className="btn btn--sm" onClick={addExample}>
+              Voorbeeldboek toevoegen
+            </button>
+          </section>
+
+          <section className="setting-group">
+            <h2 className="setting-group__title">Kast wissen</h2>
+            <p className="helper">Verwijdert alle {bookCount} boeken van dit apparaat.</p>
+            <button className="btn btn--danger btn--sm" onClick={resetAll}>
+              Alles verwijderen
+            </button>
+          </section>
         </div>
-        {backupMsg && <p className="muted">{backupMsg}</p>}
-      </section>
+      </main>
     </div>
   );
 }

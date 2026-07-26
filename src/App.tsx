@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Routes, Route, NavLink } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import { migrateCategoriesToDutch } from './db';
 import Library from './pages/Library';
 import ScanPage from './pages/ScanPage';
@@ -14,24 +14,11 @@ export default function App() {
   }, []);
 
   return (
-    <div className="app">
-      <header className="app-header">
-        <NavLink to="/" className="brand">
-          📚 Mijn Boekenkast
-        </NavLink>
-        <NavLink to="/settings" className="settings-link" title="Instellingen">
-          ⚙️
-        </NavLink>
-      </header>
-
-      <main className="app-main">
-        <Routes>
-          <Route path="/" element={<Library />} />
-          <Route path="/scan" element={<ScanPage />} />
-          <Route path="/book/:id" element={<BookDetail />} />
-          <Route path="/settings" element={<Settings />} />
-        </Routes>
-      </main>
-    </div>
+    <Routes>
+      <Route path="/" element={<Library />} />
+      <Route path="/scan" element={<ScanPage />} />
+      <Route path="/book/:id" element={<BookDetail />} />
+      <Route path="/settings" element={<Settings />} />
+    </Routes>
   );
 }

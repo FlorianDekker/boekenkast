@@ -4,6 +4,7 @@ import BarcodeScanner from '../scan/BarcodeScanner';
 import { lookupBook, type LookupResult } from '../api/lookup';
 import { hasApiKey, summarizeFromPhoto } from '../api/claude';
 import { addBook, newId } from '../db';
+import { coverTint, lastNameOf } from '../lib/cover';
 
 type Status = 'scanning' | 'looking-up' | 'preview' | 'not-found' | 'error';
 
@@ -15,6 +16,13 @@ function fileToBase64(file: File): Promise<string> {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+function sourceLabel(source: LookupResult['summarySource']): string {
+  if (source === 'google') return 'Google Books';
+  if (source === 'wikipedia') return 'Wikipedia';
+  if (source === 'ai') return 'AI (Claude)';
+  return String(source);
 }
 
 export default function ScanPage() {
@@ -71,7 +79,7 @@ export default function ScanPage() {
 
   async function onPhotoPicked(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    e.target.value = ''; // sta toe dezelfde foto opnieuw te kiezen
+    e.target.value = '';
     if (!file || !result) return;
     setPhotoBusy(true);
     setPhotoError('');
@@ -90,95 +98,116 @@ export default function ScanPage() {
   }
 
   return (
-    <div className="scan-page">
-      <h2>Boek toevoegen</h2>
+    <div className="app app--plain">
+      <header className="app-header app-header--sub">
+        <button className="app-header__back" aria-label="Terug" onClick={() => navigate('/')}>
+          ←
+        </button>
+        <span className="app-header__title">Boek scannen</span>
+      </header>
 
-      {status === 'scanning' && (
-        <>
-          <BarcodeScanner onDetected={lookup} />
-          <form className="manual-isbn" onSubmit={onManualSubmit}>
-            <label htmlFor="isbn">Of voer het ISBN handmatig in:</label>
-            <div className="row">
-              <input
-                id="isbn"
-                inputMode="numeric"
-                placeholder="bijv. 9780143127741"
-                value={manualIsbn}
-                onChange={(e) => setManualIsbn(e.target.value)}
-              />
-              <button type="submit" className="btn">
-                Zoek
+      <main className="app__main">
+        <div className="scanner">
+          {status === 'scanning' && (
+            <>
+              <BarcodeScanner onDetected={lookup} />
+              <div className="scanner__manual">
+                <div className="field">
+                  <label className="field__label">Of vul het ISBN in</label>
+                  <form className="scanner__manual-row" onSubmit={onManualSubmit}>
+                    <input
+                      className="input input--mono"
+                      inputMode="numeric"
+                      placeholder="978…"
+                      value={manualIsbn}
+                      onChange={(e) => setManualIsbn(e.target.value)}
+                    />
+                    <button type="submit" className="btn btn--secondary">
+                      Zoek
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </>
+          )}
+
+          {status === 'looking-up' && <p className="helper">Boek opzoeken…</p>}
+
+          {status === 'not-found' && (
+            <div className="scanner__manual">
+              <p className="status status--error">
+                <span className="status__dot" />
+                Geen boek gevonden bij dit ISBN.
+              </p>
+              <button className="btn btn--secondary" onClick={scanAgain}>
+                Opnieuw proberen
               </button>
             </div>
-          </form>
-        </>
-      )}
+          )}
 
-      {status === 'looking-up' && <p className="muted">Boek opzoeken…</p>}
+          {status === 'error' && (
+            <div className="scanner__manual">
+              <p className="status status--error">
+                <span className="status__dot" />
+                Er ging iets mis: {errorMsg}
+              </p>
+              <button className="btn btn--secondary" onClick={scanAgain}>
+                Opnieuw proberen
+              </button>
+            </div>
+          )}
 
-      {status === 'not-found' && (
-        <div className="scan-result">
-          <p>Geen boek gevonden voor dit ISBN.</p>
-          <button type="button" className="btn" onClick={scanAgain}>
-            Opnieuw proberen
-          </button>
-        </div>
-      )}
+          {status === 'preview' && result && (
+            <div className="preview-card">
+              <div className="preview-card__head">
+                {result.coverUrl ? (
+                  <div className="cover">
+                    <img src={result.coverUrl} alt={`Cover van ${result.title}`} />
+                  </div>
+                ) : (
+                  <div className={`cover cover--fallback ${coverTint(result.isbn ?? result.title)}`}>
+                    <span className="cover__title">{result.title}</span>
+                    <span className="cover__author">{lastNameOf(result.authors?.[0])}</span>
+                  </div>
+                )}
+                <div className="preview-card__titles">
+                  <span className="preview-card__title">{result.title}</span>
+                  {result.authors && (
+                    <span className="preview-card__author">{result.authors.join(', ')}</span>
+                  )}
+                  {result.categories.length > 0 && (
+                    <div className="preview-card__tags">
+                      {result.categories.map((c) => (
+                        <span key={c} className="chip chip--static">
+                          {c}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
 
-      {status === 'error' && (
-        <div className="scan-result">
-          <p>Er ging iets mis: {errorMsg}</p>
-          <button type="button" className="btn" onClick={scanAgain}>
-            Opnieuw proberen
-          </button>
-        </div>
-      )}
-
-      {status === 'preview' && result && (
-        <div className="scan-result">
-          <div className="preview-card">
-            {result.coverUrl ? (
-              <img src={result.coverUrl} alt={`Cover van ${result.title}`} />
-            ) : (
-              <div className="preview-cover-fallback">{result.title}</div>
-            )}
-            <div className="preview-info">
-              <h3>{result.title}</h3>
-              {result.authors && <p className="muted">{result.authors.join(', ')}</p>}
-              {result.categories.length > 0 && (
-                <p className="chips">
-                  {result.categories.map((c) => (
-                    <span key={c} className="chip">
-                      {c}
-                    </span>
-                  ))}
-                </p>
-              )}
-              <p className="preview-summary">
+              <p className="preview-card__summary">
                 {result.summary ?? 'Nog geen samenvatting gevonden.'}
               </p>
-              {result.summary && result.summarySource && (
-                <p className="source-note">
-                  bron:{' '}
-                  {result.summarySource === 'google'
-                    ? 'Google Books'
-                    : result.summarySource === 'wikipedia'
-                      ? 'Wikipedia'
-                      : result.summarySource === 'ai'
-                        ? 'AI (Claude)'
-                        : result.summarySource}
-                </p>
-              )}
+
+              <div className="preview-card__actions">
+                <button className="btn btn--primary" onClick={save}>
+                  Toevoegen aan kast
+                </button>
+                <button className="btn btn--secondary" onClick={scanAgain}>
+                  Ander boek
+                </button>
+              </div>
 
               {hasApiKey() ? (
                 <>
                   <button
-                    type="button"
-                    className="btn ghost small"
+                    className="btn btn--ghost btn--block btn--sm"
                     onClick={() => photoInputRef.current?.click()}
                     disabled={photoBusy}
                   >
-                    {photoBusy ? 'Foto verwerken…' : '📷 Betere samenvatting via foto achterkant'}
+                    {photoBusy ? 'Foto verwerken…' : '📷 Foto achterkant voor betere samenvatting'}
                   </button>
                   <input
                     ref={photoInputRef}
@@ -188,30 +217,27 @@ export default function ScanPage() {
                     hidden
                     onChange={onPhotoPicked}
                   />
-                  {photoError && <p className="scanner-error">{photoError}</p>}
+                  {photoError && (
+                    <p className="status status--error">
+                      <span className="status__dot" />
+                      {photoError}
+                    </p>
+                  )}
                 </>
               ) : (
                 <p className="source-note">
-                  Stel een <Link to="/settings">Claude API-key</Link> in voor Nederlandse
-                  AI-samenvattingen en de foto-fallback.
+                  Stel een <Link to="/settings">Claude API-key</Link> in voor AI-samenvattingen
+                  en de foto-fallback.
                 </p>
               )}
-            </div>
-          </div>
-          <div className="row">
-            <button type="button" className="btn" onClick={save}>
-              Toevoegen aan kast
-            </button>
-            <button type="button" className="btn ghost" onClick={scanAgain}>
-              Ander boek
-            </button>
-          </div>
-        </div>
-      )}
 
-      <button type="button" className="link-btn" onClick={() => navigate('/')}>
-        ← Terug naar kast
-      </button>
+              {result.summary && result.summarySource && (
+                <p className="source-note">bron: {sourceLabel(result.summarySource)}</p>
+              )}
+            </div>
+          )}
+        </div>
+      </main>
     </div>
   );
 }
