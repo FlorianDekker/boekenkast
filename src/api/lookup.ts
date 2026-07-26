@@ -2,7 +2,7 @@ import { fetchBookByIsbn, type LookupResult } from './googleBooks';
 import { fetchBookByIsbnOpenLibrary, fetchByIsbnOpenLibrarySearch } from './openLibrary';
 import { fetchWikipediaSummary } from './wikipedia';
 import { translateCategoriesLocal } from '../i18n/categories';
-import { hasApiKey, normalizeToDutch } from './claude';
+import { hasApiKey, normalizeToDutch, identifyBookByIsbn } from './claude';
 
 // Zoek een boek op ISBN en lever alles zoveel mogelijk in het Nederlands:
 // 1. Google Books (rijkste data), bij fout/limiet (429) → 2. Open Library.
@@ -32,6 +32,25 @@ export async function lookupBook(isbn: string): Promise<LookupResult | null> {
       console.warn('Open Library (zoek) mislukt:', err);
     }
   }
+  // Laatste redmiddel: Claude met web search (alleen als er een key is).
+  if (!result && hasApiKey()) {
+    try {
+      const ai = await identifyBookByIsbn(isbn);
+      if (ai) {
+        result = {
+          isbn: isbn.replace(/[^0-9Xx]/g, ''),
+          title: ai.title,
+          authors: ai.authors,
+          coverUrl: undefined,
+          summary: ai.summary,
+          summarySource: 'ai',
+          categories: ai.categories,
+        };
+      }
+    } catch (err) {
+      console.warn('Claude-identificatie mislukt:', err);
+    }
+  }
   if (!result) return null;
 
   // Categorieën alvast lokaal naar Nederlands.
@@ -52,7 +71,8 @@ export async function lookupBook(isbn: string): Promise<LookupResult | null> {
   }
 
   // Premium: laat Claude alles netjes in het Nederlands zetten (indien key).
-  if (hasApiKey()) {
+  // Sla over als het resultaat al van Claude zelf komt (voorkomt dubbele call).
+  if (hasApiKey() && result.summarySource !== 'ai') {
     try {
       const nl = await normalizeToDutch({
         title: result.title,

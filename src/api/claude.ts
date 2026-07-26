@@ -49,6 +49,73 @@ export async function testApiKey(): Promise<{ ok: boolean; message: string }> {
   }
 }
 
+function extractJson(text: string): string | null {
+  const match = text.match(/\{[\s\S]*\}/);
+  return match ? match[0] : null;
+}
+
+export interface IdentifiedBook {
+  title: string;
+  authors?: string[];
+  summary?: string;
+  categories: string[];
+}
+
+// Laatste redmiddel: laat Claude mét web search opzoeken welk boek bij een ISBN
+// hoort (voor boeken die Google Books en Open Library niet kennen — vaak
+// Nederlandse titels). Geeft alleen iets terug als Claude het kan verifiëren.
+export async function identifyBookByIsbn(isbn: string): Promise<IdentifiedBook | null> {
+  const clean = isbn.replace(/[^0-9Xx]/g, '');
+  const prompt = `Zoek met web search welk boek hoort bij ISBN ${clean}. Controleer titel en auteur op meerdere bronnen.
+Geef UITSLUITEND geldige JSON terug, geen andere tekst.
+- Als je het boek betrouwbaar kunt vaststellen:
+  {"found": true, "title": "…", "authors": ["…"], "summary": "een uitgebreide Nederlandse samenvatting van 4-7 zinnen", "categories": ["2 tot 4 korte Nederlandse categorieën"]}
+- Kun je het niet met zekerheid vaststellen: {"found": false}
+Alles in het Nederlands.`;
+
+  const messages: Anthropic.MessageParam[] = [{ role: 'user', content: prompt }];
+  const tools = [{ type: 'web_search_20260209', name: 'web_search', max_uses: 4 }];
+
+  let final: Anthropic.Message | null = null;
+  for (let i = 0; i < 4; i++) {
+    const msg = await client().messages.create({
+      model: MODEL,
+      max_tokens: 1500,
+      messages,
+      tools: tools as Anthropic.ToolUnion[],
+    });
+    if (msg.stop_reason === 'pause_turn') {
+      messages.push({ role: 'assistant', content: msg.content });
+      continue;
+    }
+    final = msg;
+    break;
+  }
+  if (!final) return null;
+
+  const text = final.content
+    .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+    .map((b) => b.text)
+    .join('\n')
+    .trim();
+
+  const json = extractJson(text);
+  if (!json) return null;
+  let parsed: { found?: boolean; title?: string; authors?: string[]; summary?: string; categories?: string[] };
+  try {
+    parsed = JSON.parse(json);
+  } catch {
+    return null;
+  }
+  if (!parsed.found || !parsed.title) return null;
+  return {
+    title: parsed.title,
+    authors: parsed.authors,
+    summary: parsed.summary?.trim() || undefined,
+    categories: Array.isArray(parsed.categories) ? parsed.categories : [],
+  };
+}
+
 export interface DutchNormalization {
   summary?: string;
   categories: string[];
