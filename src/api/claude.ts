@@ -61,6 +61,35 @@ export interface IdentifiedBook {
   categories: string[];
 }
 
+// Voert een prompt uit met web search aan; handelt de server-side tool-lus af
+// (pause_turn) en geeft de tekst van het eindantwoord terug.
+async function runWebSearch(prompt: string, maxTokens: number): Promise<string> {
+  const messages: Anthropic.MessageParam[] = [{ role: 'user', content: prompt }];
+  const tools = [{ type: 'web_search_20260209', name: 'web_search', max_uses: 4 }];
+
+  let final: Anthropic.Message | null = null;
+  for (let i = 0; i < 4; i++) {
+    const msg = await client().messages.create({
+      model: MODEL,
+      max_tokens: maxTokens,
+      messages,
+      tools: tools as Anthropic.ToolUnion[],
+    });
+    if (msg.stop_reason === 'pause_turn') {
+      messages.push({ role: 'assistant', content: msg.content });
+      continue;
+    }
+    final = msg;
+    break;
+  }
+  if (!final) return '';
+  return final.content
+    .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+    .map((b) => b.text)
+    .join('\n')
+    .trim();
+}
+
 // Laatste redmiddel: laat Claude mét web search opzoeken welk boek bij een ISBN
 // hoort (voor boeken die Google Books en Open Library niet kennen — vaak
 // Nederlandse titels). Geeft alleen iets terug als Claude het kan verifiëren.
@@ -73,31 +102,8 @@ Geef UITSLUITEND geldige JSON terug, geen andere tekst.
 - Kun je het niet met zekerheid vaststellen: {"found": false}
 Alles in het Nederlands.`;
 
-  const messages: Anthropic.MessageParam[] = [{ role: 'user', content: prompt }];
-  const tools = [{ type: 'web_search_20260209', name: 'web_search', max_uses: 4 }];
-
-  let final: Anthropic.Message | null = null;
-  for (let i = 0; i < 4; i++) {
-    const msg = await client().messages.create({
-      model: MODEL,
-      max_tokens: 1500,
-      messages,
-      tools: tools as Anthropic.ToolUnion[],
-    });
-    if (msg.stop_reason === 'pause_turn') {
-      messages.push({ role: 'assistant', content: msg.content });
-      continue;
-    }
-    final = msg;
-    break;
-  }
-  if (!final) return null;
-
-  const text = final.content
-    .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-    .map((b) => b.text)
-    .join('\n')
-    .trim();
+  const text = await runWebSearch(prompt, 1500);
+  if (!text) return null;
 
   const json = extractJson(text);
   if (!json) return null;
@@ -114,6 +120,33 @@ Alles in het Nederlands.`;
     summary: parsed.summary?.trim() || undefined,
     categories: Array.isArray(parsed.categories) ? parsed.categories : [],
   };
+}
+
+// Zoekt met web search naar directe omslag-afbeeldings-URL's voor een boek.
+// Geeft een lijst kandidaat-URL's terug; kapotte laadt de UI vanzelf weg.
+export async function findCoverImageUrls(book: {
+  isbn?: string;
+  title: string;
+  authors?: string[];
+}): Promise<string[]> {
+  const author = book.authors?.[0];
+  const prompt = `Zoek met web search naar omslagafbeeldingen (cover) van dit exacte boek:
+Titel: "${book.title}"${author ? `\nAuteur: ${author}` : ''}${book.isbn ? `\nISBN: ${book.isbn}` : ''}.
+Geef UITSLUITEND een JSON-array van directe afbeeldings-URL's die het juiste boek tonen. Voorwaarden:
+- Alleen URL's die je echt via zoeken hebt gevonden (geen verzonnen links).
+- Directe afbeeldingen: eindigend op .jpg/.jpeg/.png, of van books.google.com of covers.openlibrary.org.
+- Maximaal 6, geen dubbele. Geen andere tekst.
+Voorbeeld: ["https://…/cover.jpg", "https://…/omslag.png"]`;
+
+  const text = await runWebSearch(prompt, 1024);
+  const match = text.match(/\[[\s\S]*\]/);
+  if (!match) return [];
+  try {
+    const arr = JSON.parse(match[0]);
+    return Array.isArray(arr) ? arr.filter((u): u is string => typeof u === 'string') : [];
+  } catch {
+    return [];
+  }
 }
 
 export interface DutchNormalization {

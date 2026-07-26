@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { fetchCoverCandidates } from '../api/covers';
+import { hasApiKey, findCoverImageUrls } from '../api/claude';
 import { isPlaceholderImage } from '../lib/cover';
 
 interface Props {
@@ -28,6 +29,10 @@ function Candidate({ url, onPick }: { url: string; onPick: () => void }) {
 
 export default function CoverChooser({ book, onPick, onClose }: Props) {
   const [urls, setUrls] = useState<string[] | null>(null);
+  const [aiUrls, setAiUrls] = useState<string[]>([]);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiDone, setAiDone] = useState(false);
+  const [aiError, setAiError] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -39,6 +44,23 @@ export default function CoverChooser({ book, onPick, onClose }: Props) {
     };
   }, [book.isbn, book.title]);
 
+  // Basis + online (AI) resultaten samengevoegd, zonder dubbele.
+  const all = useMemo(() => [...new Set([...(urls ?? []), ...aiUrls])], [urls, aiUrls]);
+
+  async function aiSearch() {
+    setAiBusy(true);
+    setAiError('');
+    try {
+      const found = await findCoverImageUrls(book);
+      setAiUrls(found);
+      setAiDone(true);
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : 'Online zoeken mislukt');
+    } finally {
+      setAiBusy(false);
+    }
+  }
+
   return (
     <div className="cover-chooser">
       <p className="helper">Kies een omslag:</p>
@@ -46,7 +68,7 @@ export default function CoverChooser({ book, onPick, onClose }: Props) {
         <p className="helper">Omslagen zoeken…</p>
       ) : (
         <div className="cover-choices">
-          {urls.map((u) => (
+          {all.map((u) => (
             <Candidate key={u} url={u} onPick={() => onPick(u)} />
           ))}
           <button
@@ -58,6 +80,22 @@ export default function CoverChooser({ book, onPick, onClose }: Props) {
           </button>
         </div>
       )}
+
+      {hasApiKey() && (
+        <button type="button" className="btn btn--secondary btn--sm" onClick={aiSearch} disabled={aiBusy}>
+          {aiBusy ? 'Online zoeken…' : '🔎 Zoek online (AI)'}
+        </button>
+      )}
+      {aiDone && aiUrls.length === 0 && !aiError && (
+        <p className="helper">Online geen extra omslagen gevonden.</p>
+      )}
+      {aiError && (
+        <p className="status status--error">
+          <span className="status__dot" />
+          {aiError}
+        </p>
+      )}
+
       <button type="button" className="btn btn--ghost btn--sm" onClick={onClose}>
         Sluiten
       </button>
