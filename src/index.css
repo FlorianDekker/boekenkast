@@ -101,6 +101,8 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   overscroll-behavior-y: none;
+  /* Geen dubbeltik-zoom / vertraging. */
+  touch-action: manipulation;
 }
 
 img, picture, svg, video, canvas { display: block; max-width: 100%; }

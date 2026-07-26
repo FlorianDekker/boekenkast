@@ -13,7 +13,7 @@
   min-height: 100dvh;
   background: var(--paper);
   /* ruimte voor de vaste actiebalk onderaan */
-  padding-bottom: calc(78px + var(--safe-bottom));
+  padding-bottom: calc(100px + var(--safe-bottom));
 }
 .app--plain { padding-bottom: var(--safe-bottom); } /* schermen zonder actiebalk */
 
@@ -208,7 +208,7 @@
   z-index: 30;
   display: flex;
   gap: var(--sp-3);
-  padding: var(--sp-3) var(--gutter) calc(var(--sp-3) + var(--safe-bottom));
+  padding: var(--sp-4) var(--gutter) calc(var(--sp-6) + var(--safe-bottom));
   background: var(--paper);
   border-top: 1px solid var(--line);
 }
@@ -234,7 +234,7 @@
 .scanner__stage {
   position: relative;
   aspect-ratio: 3 / 4;
-  max-height: 52dvh;
+  width: 100%;
   overflow: hidden;
   border-radius: var(--r-xl);
   background: #1a1815;
