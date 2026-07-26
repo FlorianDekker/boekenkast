@@ -8,6 +8,15 @@ export function coverTint(seed: string): string {
   return `cover--c${(Math.abs(hash) % 6) + 1}`;
 }
 
+// Google's "geen afbeelding beschikbaar"-placeholder is exact 128×170px.
+// Behandel dat (en 1×1-pixels) als een ongeldige cover.
+export function isPlaceholderImage(img: HTMLImageElement): boolean {
+  const w = img.naturalWidth;
+  const h = img.naturalHeight;
+  if (w <= 1 || h <= 1) return true;
+  return w === 128 && h === 170;
+}
+
 // Achternaam in kapitalen voor het label op de fallback-cover.
 export function lastNameOf(author?: string): string {
   if (!author) return '';

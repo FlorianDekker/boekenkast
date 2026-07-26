@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, updateBook, deleteBook } from '../db';
 import { hasApiKey, normalizeToDutch } from '../api/claude';
 import Cover from '../components/Cover';
+import CoverChooser from '../components/CoverChooser';
 
 export default function BookDetail() {
   const { id } = useParams<{ id: string }>();
@@ -13,6 +14,7 @@ export default function BookDetail() {
   const [note, setNote] = useState('');
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState('');
+  const [chooser, setChooser] = useState(false);
   useEffect(() => {
     if (book) setNote(book.note ?? '');
   }, [book?.id]);
@@ -84,6 +86,12 @@ export default function BookDetail() {
     }
   }
 
+  async function pickCover(url: string | null) {
+    if (!book) return;
+    await updateBook(book.id, { coverUrl: url ?? undefined, coverHidden: url === null });
+    setChooser(false);
+  }
+
   async function remove() {
     if (!book) return;
     if (confirm(`"${book.title}" uit je kast verwijderen?`)) {
@@ -110,6 +118,7 @@ export default function BookDetail() {
               title={book.title}
               author={book.authors?.[0]}
               seed={book.isbn ?? book.id}
+              hidden={book.coverHidden}
             />
             <div className="book-detail__titles">
               <h1 className="book-detail__title">{book.title}</h1>
@@ -125,6 +134,22 @@ export default function BookDetail() {
               )}
             </div>
           </div>
+
+          <div className="book-detail__cover-actions">
+            <button
+              className="btn btn--ghost btn--sm"
+              onClick={() => setChooser((v) => !v)}
+            >
+              {chooser ? 'Sluiten' : 'Ander omslag kiezen'}
+            </button>
+          </div>
+          {chooser && (
+            <CoverChooser
+              book={{ isbn: book.isbn, title: book.title, authors: book.authors }}
+              onPick={pickCover}
+              onClose={() => setChooser(false)}
+            />
+          )}
 
           <button className="toggle-row" role="switch" aria-checked={isRead} onClick={toggleRead}>
             <span className="toggle-row__label">Gelezen</span>

@@ -23,6 +23,7 @@ export default function BookCard({ book }: Props) {
         title={book.title}
         author={book.authors?.[0]}
         seed={book.isbn ?? book.id}
+        hidden={book.coverHidden}
       />
       <div className="book-card__meta">
         <span className="book-card__title">{book.title}</span>

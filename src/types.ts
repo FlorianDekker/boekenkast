@@ -8,6 +8,7 @@ export interface Book {
   title: string;
   authors?: string[];
   coverUrl?: string;
+  coverHidden?: boolean; // gebruiker koos bewust de gekleurde rug i.p.v. een afbeelding
   summary?: string;
   summarySource?: SummarySource;
   categories: string[];
